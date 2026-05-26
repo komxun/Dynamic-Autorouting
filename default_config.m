@@ -10,16 +10,15 @@ cfg.tsim         = 100;       % [s]  max IFDS iterations per re-plan
 cfg.dt           = 0.1;       % [s]  IFDS integration step
 cfg.dt_traj      = 1;         % [s]  trajectory re-plan interval
 cfg.rtsim        = 50;        % [-]  number of re-plan steps (rtsim = T / dt_traj)
-cfg.simMode      = 1;         % 1: by time, 2: by target distance
+cfg.simMode      = 2;         % 1: by time, 2: by target distance
 cfg.targetThresh = 2;         % [m]  allowed error for final target distance
 
 %% ======================== Scenario =======================================
-cfg.scene        = 44;        % Scene number (see create_scene.m)
+cfg.scene        = 3;        % Scene number (see create_scene.m)
                               %   0) No object   1) 1 sphere   2) 2 objects
                               %   3) 3 objects   4) 3 complex  5) demo shapes
                               %   7) non-urban  12) urban      41/42/44) dynamic
-                              %  69/6969) multi-sphere
-cfg.env          = "dynamic"; % "static" or "dynamic"
+cfg.env          = "static"; % "static" or "dynamic" environmental constraint
 cfg.multiTarget  = false;     % true: fly to multiple destinations
 
 %% ======================== IFDS Tuning ====================================
@@ -83,7 +82,7 @@ cfg.P = P;
 %% ======================== Display ========================================
 cfg.fontSize     = 20;
 cfg.saveVid      = false;
-cfg.animation    = false;     % true: animate Figure 69 frame-by-frame
+cfg.animation    = true;     % true: animate Figure 69 frame-by-frame
 cfg.showDisp     = true;
 
 end

@@ -28,7 +28,7 @@ function [weatherMat, weatherMatMod, WMCell, dwdxCell, dwdyCell] = ...
     % Build gridded interpolants and gradient interpolants
     xspace = 1:200;
     yspace = 1:200;
-    [xgrid, ygrid] = meshgrid(xspace, yspace);
+    [xgrid, ygrid] = ndgrid(xspace, yspace);
 
     nT = size(weatherMat, 3);
     WMCell   = cell(1, nT);
@@ -38,8 +38,8 @@ function [weatherMat, weatherMatMod, WMCell, dwdxCell, dwdyCell] = ...
     for j = 1:nT
         WMCell{j} = griddedInterpolant(weatherMat(:,:,j)');
         z_values = WMCell{j}(xgrid, ygrid);
-        [grad_x, grad_y] = gradient(z_values, xspace, yspace);
-        dwdxCell{j} = griddedInterpolant(grad_x');
-        dwdyCell{j} = griddedInterpolant(grad_y');
+        [grad_y, grad_x] = gradient(z_values, yspace, xspace);
+        dwdxCell{j} = griddedInterpolant(grad_x);
+        dwdyCell{j} = griddedInterpolant(grad_y);
     end
 end

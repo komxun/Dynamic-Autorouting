@@ -73,7 +73,7 @@ subplot(3, 2, [2 4 6]); hold on; grid on
 plot(t, L.Psi, 'LineWidth', 1.6)
 ylabel('\Psi  (SO(3) error)')
 xlabel('t [s]')
-title('Attitude error function  \Psi = \frac{1}{2} tr(I - R_c^T R)')
+title('Attitude error function  $\Psi = \frac{1}{2} \mathrm{tr}(I - R_c^T R)$', 'Interpreter', 'latex')
 
 %% ================ Figure 4 : Actuators ==============================
 figure(4); clf

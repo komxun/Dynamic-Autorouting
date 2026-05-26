@@ -28,6 +28,7 @@ targetThresh = cfg.targetThresh;
 scene = cfg.scene;
 useOptimizer = cfg.useOptimizer;
 alpha_deg = 0;
+animation    = cfg.animation;
 
 % Destinations
 if cfg.multiTarget
@@ -129,6 +130,7 @@ for rt = 1:rtsim
 end
 
 fprintf('Average compute time = %.4f s\n', mean(timer_log(timer_log ~= 0)));
+disp('Plotting results. Please wait. . .')
 
 %% 4. Plot results
 % Workspace variables needed by plotting_everything.m
@@ -168,6 +170,18 @@ end
 
 subplot(7,2,[2 4 6 8])
 plotting_everything
+if k ~= 0
+    hold on, set(gca, 'YDir', 'normal'), colormap turbo
+    if env == "dynamic"
+        contourf(1:200,-100:99, weatherMatMod(:,:,rt_plot), 30, 'FaceAlpha',1,'LineStyle','none')
+    else
+        contourf(1:200,-100:99, weatherMatMod(:,:,15), 30, 'LineStyle','-')
+    end
+    [C2,h2] = contourf(1:200, -100:99, weatherMat(:,:,rt), [B_U, B_U], 'FaceAlpha',0,'LineColor', 'w', 'LineWidth', 2);
+    clabel(C2,h2,'FontSize',15,'Color','w')
+    colorbar
+    hold off
+end
 view(0,90), grid off
 
 subplot(7,2,[9 11 13])
@@ -180,3 +194,30 @@ view(0,0)
 
 sgtitle(sprintf('IFDS  \\rho_0=%.2f  \\sigma_0=%.2f  scene=%d  t=%.0fs', ...
     cfg.rho0, cfg.sigma0, cfg.scene, rt_plot*dt_traj), 'FontSize', cfg.fontSize);
+
+% --- Offline animation (replay from logged data) ---
+if animation
+    disp("Animating the simulation . . .")
+    figure(69); clf
+    set(gcf, 'Position', get(0, 'Screensize'));
+    nFrames = min(size(traj,2), rtsim);
+    for rt = 1:nFrames
+        if isempty(traj{rt}), continue; end
+        clf
+        plotting_everything
+        if k ~= 0
+            hold on, set(gca, 'YDir', 'normal'), colormap turbo
+            if env == "dynamic"
+                contourf(1:200,-100:99, weatherMatMod(:,:,rt), 30, 'FaceAlpha',1,'LineStyle','none')
+            else
+                contourf(1:200,-100:99, weatherMatMod(:,:,15), 30, 'LineStyle','-')
+            end
+            hold off
+        end
+        title(sprintf('t = %d s', rt), 'FontSize', fontSize)
+        drawnow
+        pause(0.05)
+    end
+end
+
+disp("====== Completed ======")
