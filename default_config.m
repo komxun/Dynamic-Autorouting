@@ -82,7 +82,7 @@ cfg.P = P;
 %% ======================== Display ========================================
 cfg.fontSize     = 20;
 cfg.saveVid      = false;
-cfg.animation    = true;     % true: animate Figure 69 frame-by-frame
+cfg.animation    = false;     % true: animate Figure 69 frame-by-frame
 cfg.showDisp     = true;
 
 end
