@@ -39,6 +39,7 @@ function [Param, Object, state, filters, logger, WMCell, dwdxCell, dwdyCell, ...
     Param.k              = cfg.k;
     Param.B_U            = cfg.B_U;
     Param.B_L            = cfg.B_L;
+    if isfield(cfg, 'zFloor'), Param.zFloor = cfg.zFloor; else, Param.zFloor = 0; end
 
     %% Object structure pre-allocation
     switch cfg.scene
@@ -54,6 +55,9 @@ function [Param, Object, state, filters, logger, WMCell, dwdxCell, dwdyCell, ...
         case 42,   numObj = 4;
         case 44,   numObj = 7;
         case 69,   numObj = 4;
+        case 100   % GeoJSON buildings
+            building_store(cfg.buildings);
+            numObj = numel(cfg.buildings);
         case 6969, numObj = 3;
         otherwise, error('Unknown scene: %d', cfg.scene);
     end
@@ -62,7 +66,7 @@ function [Param, Object, state, filters, logger, WMCell, dwdxCell, dwdyCell, ...
     Object(numObj) = struct('origin', zeros(cfg.rtsim, 3), ...
         'Gamma', 0, 'n', [], 't', [], ...
         'a', 0, 'b', 0, 'c', 0, ...
-        'p', 0, 'q', 0, 'r', 0, 'Rstar', 0);
+        'p', 0, 'q', 0, 'r', 0, 'yaw', 0, 'Rstar', 0);
 
     %% SE(3) UAV state
     state.p     = [cfg.x_i; cfg.y_i; cfg.z_i];

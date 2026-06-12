@@ -94,6 +94,14 @@ function Obj = create_scene(num, Obj, X, Y, Z, rt, alpha_deg)
             Obj(3) = create_shape(X, Y, Z, 100, -20, 0, 20, 20, 20, 1, 1, 1, rt, alpha_deg, Obj(3));
             Obj(4) = create_shape(X, Y, Z, 100, 5, 80, 15, 15, 15, 1, 1, 1, rt, alpha_deg, Obj(4));
 
+        case 100  % GeoJSON buildings (oriented parallelepipeds)
+            B = building_store();
+            for j = 1:numel(B)
+                Obj(j) = create_shape(X, Y, Z, B(j).x0, B(j).y0, B(j).z0, ...
+                    B(j).a, B(j).b, B(j).c, B(j).p, B(j).q, B(j).r, ...
+                    rt, alpha_deg, Obj(j), B(j).yaw);
+            end
+
         case 6969  % Dynamic: 3 spheres orbiting
             Obj(1) = create_shape(X, Y, Z, 100+30*sin(rt/8), 0+30*cos(rt/8), 0, 20, 20, 20, 1, 1, 1, rt, alpha_deg, Obj(1));
             Obj(2) = create_shape(X, Y, Z, 100, 0, 0, 20, 20, 80, 1, 1, 4, rt, alpha_deg, Obj(2));

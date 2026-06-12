@@ -1,0 +1,194 @@
+function [B, dom] = load_buildings_geojson(file, opts)
+% LOAD_BUILDINGS_GEOJSON  Parse a GeoJSON building footprint file and fit an
+% oriented parallelepiped (box) to each building footprint.
+%
+%   [B, dom] = load_buildings_geojson(file, opts)
+%
+%   Each GeoJSON Polygon feature is:
+%     1. converted from [lon lat] (WGS-84) to a local east-north metric
+%        frame using an equirectangular projection about the mean lat/lon
+%        (no Aerospace Toolbox dependency, accurate over a few hundred m),
+%     2. fitted with the minimum-area enclosing rectangle (rotating
+%        calipers over the convex hull) -> centre, half-extents and yaw,
+%     3. extruded to the building 'height' property to form a box that is
+%        represented in IFDS as an oriented super-ellipsoid prism.
+%
+%   The whole scene is translated so all coordinates are positive (a margin
+%   is kept from the origin), matching the convention in CA_Lee2026.
+%
+%   Inputs:
+%     file  - path to the .geojson file
+%     opts  - optional struct:
+%               .margin    [m] gap kept between scene and axes origin (def 20)
+%               .pad       [m] lateral safety added to box half-extents (def 2)
+%               .p         super-ellipsoid exponent index (def 4 -> ^8 box)
+%               .minHeight [m] floor for missing/zero heights (def 3)
+%
+%   Outputs:
+%     B   - struct array (one per building) with fields:
+%             x0,y0,z0  box centre [m]
+%             a,b,c     box half-extents (local x, local y, z) [m]
+%             p,q,r     super-ellipsoid exponent indices
+%             yaw       in-plane orientation [rad]
+%             foot      5x2 closed footprint corners (world frame) [m]
+%             height    building height [m]
+%     dom - struct with scene extents and a suggested start/finish pair:
+%             xmin,xmax,ymin,ymax,zmax
+%             start  [x y z] just outside the field (low-x side)
+%             final  [x y z] just outside the field (high-x side)
+
+    if nargin < 2 || isempty(opts), opts = struct(); end
+    if ~isfield(opts, 'margin'),    opts.margin    = 20;  end
+    if ~isfield(opts, 'pad'),       opts.pad       = 2;   end
+    if ~isfield(opts, 'p'),         opts.p         = 4;   end
+    if ~isfield(opts, 'minHeight'), opts.minHeight = 3;   end
+
+    geo = jsondecode(fileread(file));
+    features = geo.features;
+    n = numel(features);
+
+    % ---- First pass: gather rings, heights and reference origin ----
+    rings   = cell(n, 1);
+    heights = zeros(n, 1);
+    lons = []; lats = [];
+    for ii = 1:n
+        if iscell(features), feat = features{ii}; else, feat = features(ii); end
+        % ring is a set of building's vertices coordinates
+        ring = feat.geometry.coordinates;
+        % if data type of ring is cell, convert to double
+        while iscell(ring), ring = ring{1}; end
+        % if ring has 3 dimensions (usually), squeeze into 2 dimensions
+        if ndims(ring) == 3, ring = squeeze(ring(1, :, :)); end
+        % Delete the duplicated start/end vertices of the building
+        if size(ring, 1) > 1 && isequal(ring(1, :), ring(end, :))
+            ring(end, :) = [];
+        end
+        rings{ii} = ring;
+
+        if isfield(feat.properties, 'height') && ~isempty(feat.properties.height)
+            heights(ii) = feat.properties.height;
+        else
+            % if building heights are not specified, assume minHeight
+            heights(ii) = opts.minHeight;
+        end
+
+        lons = [lons; ring(:, 1)]; %#ok<AGROW>
+        lats = [lats; ring(:, 2)]; %#ok<AGROW>
+    end
+
+    lat0 = mean(lats);  lon0 = mean(lons);
+    mPerLat = 111320;
+    mPerLon = 111320 * cosd(lat0);
+
+    % ---- Second pass: project to metres and fit oriented box ----
+    B = repmat(struct('x0', 0, 'y0', 0, 'z0', 0, 'a', 0, 'b', 0, 'c', 0, ...
+        'p', opts.p, 'q', opts.p, 'r', opts.p, 'yaw', 0, 'foot', [], ...
+        'poly', [], 'height', 0), n, 1);
+
+    allXY = [];
+    for ii = 1:n
+        ring = rings{ii};
+        x = (ring(:, 1) - lon0) * mPerLon;
+        y = (ring(:, 2) - lat0) * mPerLat;
+
+        [cx, cy, ha, hb, ang, corners] = min_area_rect(x, y);
+        h = max(heights(ii), opts.minHeight);
+
+        B(ii).x0  = cx;          B(ii).y0  = cy;          B(ii).z0 = h / 2;
+        B(ii).a   = ha + opts.pad;
+        B(ii).b   = hb + opts.pad;
+        B(ii).c   = h / 2;
+        B(ii).p   = opts.p;      B(ii).q   = opts.p;      B(ii).r  = opts.p;
+        B(ii).yaw = ang;
+        B(ii).foot   = corners;
+        B(ii).poly   = [x, y];        % real (un-fitted) footprint polygon
+        B(ii).height = h;
+
+        allXY = [allXY; x, y]; %#ok<AGROW>
+    end
+
+    % ---- Translate scene so everything is positive (keep margin) ----
+    gmin = min(allXY, [], 1);
+    off  = -gmin + opts.margin;
+    for ii = 1:n
+        B(ii).x0   = B(ii).x0 + off(1);
+        B(ii).y0   = B(ii).y0 + off(2);
+        B(ii).foot = B(ii).foot + off;
+        B(ii).poly = B(ii).poly + off;
+    end
+
+    % ---- Scene extents and auto start/finish (just outside the field) ----
+    xs = [B.x0];  ys = [B.y0];
+    as = [B.a];   bs = [B.b];
+    dom.xmin = min(xs - as);   dom.xmax = max(xs + as);
+    dom.ymin = min(ys - bs);   dom.ymax = max(ys + bs);
+    dom.zmax = max([B.z0] + [B.c]);
+
+    ymid  = (dom.ymin + dom.ymax) / 2;
+    clear2 = opts.margin;                 % stand-off distance from the field
+    dom.start = [dom.xmin - clear2, ymid, NaN];   % z filled in by caller
+    dom.final = [dom.xmax + clear2, ymid, NaN];
+end
+
+% =========================================================================
+function [cx, cy, ha, hb, ang, corners] = min_area_rect(x, y)
+% MIN_AREA_RECT  Minimum-area enclosing rectangle via rotating calipers.
+%
+%   Returns the rectangle centre (cx, cy), half-extents (ha along local x,
+%   hb along local y), orientation ang [rad] of the local x-axis, and the
+%   5x2 closed corner list in the world frame.
+
+    x = x(:);  y = y(:);
+
+    % Degenerate footprints -> axis-aligned bounding box
+    if numel(x) < 3
+        cx = mean(x);  cy = mean(y);
+        ha = max((max(x) - min(x)) / 2, 0.5);
+        hb = max((max(y) - min(y)) / 2, 0.5);
+        ang = 0;
+        corners = box_corners(cx, cy, ha, hb, ang);
+        return
+    end
+
+    try
+        k = convhull(x, y);
+    catch
+        k = (1:numel(x))';  k(end + 1) = 1;
+    end
+    hx = x(k);  hy = y(k);     % closed convex polygon
+
+    bestArea = inf;
+    cx = mean(x); cy = mean(y); ha = 1; hb = 1; ang = 0;
+    for i = 1:numel(hx) - 1
+        ex = hx(i + 1) - hx(i);
+        ey = hy(i + 1) - hy(i);
+        if ex == 0 && ey == 0, continue; end
+
+        th = atan2(ey, ex);
+        c  = cos(-th);  s = sin(-th);
+        xr =  c*hx - s*hy;     % rotate hull into edge-aligned frame
+        yr =  s*hx + c*hy;
+
+        w = max(xr) - min(xr);
+        h = max(yr) - min(yr);
+        A = w * h;
+        if A < bestArea
+            bestArea = A;
+            ha  = w / 2;  hb = h / 2;  ang = th;
+            cxr = (max(xr) + min(xr)) / 2;
+            cyr = (max(yr) + min(yr)) / 2;
+            cb  = cos(th);  sb = sin(th);     % rotate centre back to world
+            cx  = cb*cxr - sb*cyr;
+            cy  = sb*cxr + cb*cyr;
+        end
+    end
+
+    corners = box_corners(cx, cy, ha, hb, ang);
+end
+
+% =========================================================================
+function corners = box_corners(cx, cy, ha, hb, ang)
+    R   = [cos(ang), -sin(ang); sin(ang), cos(ang)];
+    loc = [ ha,  hb;  -ha,  hb;  -ha, -hb;   ha, -hb;   ha,  hb];
+    corners = (R * loc')' + [cx, cy];
+end

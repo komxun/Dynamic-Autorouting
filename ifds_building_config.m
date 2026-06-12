@@ -1,4 +1,4 @@
-function cfg = default_config()
+function cfg = ifds_building_config()
 % DEFAULT_CONFIG  All tunable parameters for IFDS dynamic autorouting.
 %
 %   Edit this file to change simulation parameters.  Then run main.m.
@@ -23,11 +23,11 @@ cfg.env          = "static"; % "static" or "dynamic" environmental constraint
 cfg.multiTarget  = false;     % true: fly to multiple destinations
 
 %% ---- GeoJSON scenario options (only used when cfg.scene == 100) ----------
-cfg.geojson_file = fullfile('data', 'buildings.geojson');
+cfg.geojson_file = fullfile('data', 'buildings_map5.geojson');
 cfg.geojson_alt  = 8;        % [m] cruise altitude (start/finish & target z)
-cfg.geojson_p    = 4;        % super-ellipsoid exponent index (^8 -> sharp box)
-cfg.geojson_pad  = 2;        % [m] lateral safety added to each box
-cfg.geojson_corridor = 50;   % [m] keep buildings within this margin of the
+cfg.geojson_p    = 2;        % super-ellipsoid exponent index (^8 -> sharp box)
+cfg.geojson_pad  = 1.5;        % [m] lateral safety added to each box
+cfg.geojson_corridor = 500;   % [m] keep buildings within this margin of the
                               %     start->finish line (only these run in IFDS)
 cfg.geojson_mergeGap = 1.5;  % [m] merge footprints within this gap into one
                               %     box (0 = only touching; see load_buildings_geojson)
@@ -38,17 +38,17 @@ cfg.zFloor       = 2;        % [m] minimum AGL altitude; IFDS waypoints are
 
 %% ======================== IFDS Tuning ====================================
 cfg.rho0         = 2.5;       % Repulsive parameter  (rho >= 0)
-cfg.sigma0       = 0.01;      % Tangential parameter
+cfg.sigma0       = 0.5;      % Tangential parameter
 cfg.sf           = uint8(0);  % Shape-following demand (1 = on, 0 = off)
 
 %% ======================== Constraint Matrix ==============================
-cfg.k            = 0.5;       % Weather coupling gain (0 = no weather effect)
+cfg.k            = 0;       % Weather coupling gain (0 = no weather effect)
 cfg.B_U          = 0.9;       % Upper bound  [B_L < B_U <= 1]
 cfg.B_L          = 0;         % Lower bound  [0 <= B_L < B_U]
 
 %% ======================== Path Optimizer =================================
 cfg.useOptimizer = 0;         % 0: Off,  1: Global optimized,  2: Local optimized
-cfg.delta_g      = 2;        % [m]  minimum allowed gap distance
+cfg.delta_g      = 7;        % [m]  minimum allowed gap distance
 
 %% ======================== UAV ============================================
 cfg.C            = 9.5;       % [m/s] UAV cruising speed

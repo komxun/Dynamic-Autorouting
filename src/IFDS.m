@@ -23,6 +23,7 @@ function [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg,
     k            = Param.k;
     B_U          = Param.B_U;
     B_L          = Param.B_L;
+    if isfield(Param, 'zFloor'), zFloor = Param.zFloor; else, zFloor = 0; end
 
     xd = loc_final(1);
     yd = loc_final(2);
@@ -70,6 +71,7 @@ function [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg,
         end
 
         Wp(:,t+1) = Wp(:,t) + UBar * dt;
+        Wp(3,t+1) = max(Wp(3,t+1), zFloor);   % never descend below AGL floor
         t = t + 1;
     end
 
