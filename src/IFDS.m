@@ -1,8 +1,5 @@
-function [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg, loc_final, rt, Wp, Paths, Param, L, Object, weatherMat, dwdx, dwdy)
+function [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg, loc_final, rt, Wp, Paths, Param, L, Object)
 % IFDS  Interfered Fluid Dynamical System path planner.
-%
-%   [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg,
-%       loc_final, rt, Wp, Paths, Param, L, Object, weatherMat, dwdx, dwdy)
 %
 %   Computes a collision-free path from the current waypoint to loc_final
 %   using the IFDS velocity-field approach with weather-constraint coupling.
@@ -20,10 +17,9 @@ function [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg,
     showDisp     = Param.showDisp;
     useOptimizer = Param.useOptimizer;
     delta_g      = Param.Rg;
-    k            = Param.k;
-    B_U          = Param.B_U;
-    B_L          = Param.B_L;
+  
     if isfield(Param, 'zFloor'), zFloor = Param.zFloor; else, zFloor = 0; end
+    zCeil = 15;
 
     xd = loc_final(1);
     yd = loc_final(2);
@@ -57,10 +53,6 @@ function [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg,
             break
         end
 
-        % Weather constraints
-        if k ~= 0
-            Object = apply_weather(Object, Param.numObj, k, B_L, B_U, xx, yy, weatherMat, dwdx, dwdy);
-        end
 
         % Compute modulated velocity
         [UBar, rho0, sigma0, errFlag] = calc_ubar(xx, yy, zz, xd, yd, zd, ...
@@ -72,6 +64,7 @@ function [Paths, Object, totalLength, foundPath] = IFDS(rho0, sigma0, alpha_deg,
 
         Wp(:,t+1) = Wp(:,t) + UBar * dt;
         Wp(3,t+1) = max(Wp(3,t+1), zFloor);   % never descend below AGL floor
+        Wp(3,t+1) = min(Wp(3,t+1), zCeil);   % never ascend above ceiling
         t = t + 1;
     end
 

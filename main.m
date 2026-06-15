@@ -10,16 +10,14 @@ addpath('src', 'plots', 'data')
 cfg = default_config();
 
 %% 2. Setup simulation
-[Param, Object, state, filters, logger, WMCell, dwdxCell, dwdyCell, ...
- weatherMat, weatherMatMod] = setup_simulation(cfg);
+[Param, Object, state, filters, logger] = setup_simulation(cfg);
 
 P        = cfg.P;
 rho0     = cfg.rho0;
 sigma0   = cfg.sigma0;
 dt_traj  = cfg.dt_traj;
 C        = cfg.C;
-env      = cfg.env;
-k        = cfg.k;
+V_ref = 9.5;
 rtsim    = cfg.rtsim;
 x_i = cfg.x_i;  y_i = cfg.y_i;  z_i = cfg.z_i;
 Xini = cfg.Xini; Yini = cfg.Yini; Zini = cfg.Zini;
@@ -62,7 +60,7 @@ for rt = 1:rtsim
     end
 
     % Set path start
-    if scene == 41 || scene == 42 || (k ~= 0 && env == "dynamic") || scene == 44
+    if scene == 41 || scene == 42 || scene == 44
         Wp(:,1) = [x_i; y_i; z_i];
     else
         Wp(:,1) = [Xini; Yini; Zini];
@@ -77,14 +75,11 @@ for rt = 1:rtsim
         loc_final = destin(L,:)';
 
         if useOptimizer == 1
-            [rho0, sigma0] = path_optimizing(loc_final, rt, Wp, Paths, Param, Object, WMCell{rt}, dwdxCell{rt}, dwdyCell{rt});
+            [rho0, sigma0] = path_optimizing(loc_final, rt, Wp, Paths, Param, Object);
         end
-
-        if env == "dynamic"
-            [Paths, Object, ~, foundPath] = IFDS(rho0, sigma0, alpha_deg, loc_final, rt, Wp, Paths, Param, L, Object, WMCell{rt}, dwdxCell{rt}, dwdyCell{rt});
-        else
-            [Paths, Object, ~, foundPath] = IFDS(rho0, sigma0, alpha_deg, loc_final, rt, Wp, Paths, Param, L, Object, WMCell{15}, dwdxCell{15}, dwdyCell{15});
-        end
+        
+        [Paths, Object, ~, foundPath] = IFDS(rho0, sigma0, alpha_deg, loc_final, rt, Wp, Paths, Param, L, Object);
+  
     end
 
     % Handle path-not-found: hover in place
@@ -116,7 +111,7 @@ for rt = 1:rtsim
 
         dt_budget = dt_traj - dtcum;
         [pos_seg, ~, state, filters, timeSpent, logger] = ...
-            SE3Track(Wi, Wf, state, filters, C, dt_budget, P, logger);
+            SE3Track(Wi, Wf, state, filters, V_ref, dt_budget, P, logger);
         x_i = state.p(1);  y_i = state.p(2);  z_i = state.p(3);
         dtcum = dtcum + timeSpent;
         trajectory = [trajectory, pos_seg(:, 2:end)];
@@ -138,7 +133,6 @@ syms X Y Z Gamma(X,Y,Z) Gamma_star(X,Y,Z)
 fontSize     = cfg.fontSize;
 delta_g      = cfg.delta_g;
 multiTarget  = cfg.multiTarget;
-B_U          = cfg.B_U;
 
 % --- Position & speed history ---
 figure('Name', 'State History')
@@ -158,30 +152,9 @@ rt = rt_plot;  % workspace variable used by plotting_everything.m
 
 subplot(7,2,[1 3 5 7])
 plotting_everything
-if k ~= 0
-    hold on, set(gca, 'YDir', 'normal'), colormap turbo
-    if env == "dynamic"
-        contourf(1:200,-100:99, weatherMatMod(:,:,rt_plot), 30, 'FaceAlpha',1,'LineStyle','none')
-    else
-        contourf(1:200,-100:99, weatherMatMod(:,:,15), 30, 'LineStyle','-')
-    end
-    hold off
-end
 
 subplot(7,2,[2 4 6 8])
 plotting_everything
-if k ~= 0
-    hold on, set(gca, 'YDir', 'normal'), colormap turbo
-    if env == "dynamic"
-        contourf(1:200,-100:99, weatherMatMod(:,:,rt_plot), 30, 'FaceAlpha',1,'LineStyle','none')
-    else
-        contourf(1:200,-100:99, weatherMatMod(:,:,15), 30, 'LineStyle','-')
-    end
-    [C2,h2] = contourf(1:200, -100:99, weatherMat(:,:,rt), [B_U, B_U], 'FaceAlpha',0,'LineColor', 'w', 'LineWidth', 2);
-    clabel(C2,h2,'FontSize',15,'Color','w')
-    colorbar
-    hold off
-end
 view(0,90), grid off
 
 subplot(7,2,[9 11 13])
@@ -205,15 +178,6 @@ if animation
         if isempty(traj{rt}), continue; end
         clf
         plotting_everything
-        if k ~= 0
-            hold on, set(gca, 'YDir', 'normal'), colormap turbo
-            if env == "dynamic"
-                contourf(1:200,-100:99, weatherMatMod(:,:,rt), 30, 'FaceAlpha',1,'LineStyle','none')
-            else
-                contourf(1:200,-100:99, weatherMatMod(:,:,15), 30, 'LineStyle','-')
-            end
-            hold off
-        end
         title(sprintf('t = %d s', rt), 'FontSize', fontSize)
         drawnow
         pause(0.05)

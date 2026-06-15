@@ -78,7 +78,7 @@ for i = 1:nPairs
     cfgi.Xini = p0(1); cfgi.Yini = p0(2); cfgi.Zini = z0;
     cfgi.Xfinal = p1(1); cfgi.Yfinal = p1(2); cfgi.Zfinal = z1;
 
-    [Param, Object, ~, ~, ~, WMCell, dwdxCell, dwdyCell] = setup_simulation(cfgi);
+    [Param, Object, ~, ~, ~] = setup_simulation(cfgi);
 
     % Single IFDS call (rt = 1) -> one global path, no SE(3) tracking
     Wp = zeros(3, cfgi.tsim + 1);
@@ -87,7 +87,7 @@ for i = 1:nPairs
     loc_final = [p1(1); p1(2); z1];
 
     [Paths, Object, len, fp] = IFDS(cfg.rho0, cfg.sigma0, 0, loc_final, 1, ...
-        Wp, Paths, Param, 1, Object, WMCell{15}, dwdxCell{15}, dwdyCell{15});
+        Wp, Paths, Param, 1, Object);
 
     Paths10{i} = Paths{1, 1};
     lengths(i) = len;
@@ -204,6 +204,10 @@ wpSpacing = 10;        % [m] min horizontal spacing between exported waypoints
 wpDir     = fullfile('output', 'waypoints');
 if ~exist(wpDir, 'dir'), mkdir(wpDir); end
 
+% Terrain DEM used to set each mission's HOME altitude to the real ground
+% elevation (AMSL) at the home lat/lon (see dem_elevation_amsl below).
+demFile = fullfile('data', 'map6', 'textures', 'map6_height_map.tif');
+
 nExported = 0;
 for i = 1:nPairs
     T = Traj10{i};
@@ -221,10 +225,14 @@ for i = 1:nPairs
     % compass yaw [deg, CW from North] for the MAVLink waypoint (param4)
     yaw = mod(90 - rad2deg(Tk(4, :)), 360);
 
+    % HOME absolute elevation (AMSL) sampled from the terrain DEM at home
+    homeAmsl = dem_elevation_amsl(lat(1), lon(1), demFile);
+
     fname = fullfile(wpDir, sprintf('pair_%02d.waypoints', i));
-    write_qgc_wpl(fname, lat, lon, alt, yaw);
+    write_qgc_wpl(fname, lat, lon, alt, yaw, homeAmsl);
     nExported = nExported + 1;
-    fprintf('Exported pair %2d -> %s (%d waypoints)\n', i, fname, numel(lat));
+    fprintf('Exported pair %2d -> %s (%d wp, home %.1f m AMSL)\n', ...
+        i, fname, numel(lat), homeAmsl);
 end
 fprintf('Wrote %d waypoint file(s) to %s\n', nExported, wpDir);
 
@@ -278,12 +286,54 @@ function [lat, lon] = local_to_geo(X, Y, geo)
     lat = geo.lat0 + (Y - geo.offset(2)) / geo.mPerLat;
 end
 
-function write_qgc_wpl(fname, lat, lon, alt, yaw)
+function elev = dem_elevation_amsl(lat, lon, demFile)
+% DEM_ELEVATION_AMSL  Ground elevation [m AMSL] at a WGS-84 lat/lon, sampled
+% from the Gazebo terrain heightmap (data/map6/textures/map6_height_map.tif).
+%
+% Georeferencing (from data/map6/map6.sdf and model.sdf):
+%   * World ENU origin (0,0,0) at lat0/lon0, elevation elev0 [m AMSL].
+%   * Heightmap is W x H m, centred at world (Cx,Cy); pixel 0..255 maps to
+%     world Z = Zbase + (px/255)*Vz, so AMSL = elev0 + Zbase + (px/255)*Vz.
+%   * Image columns increase to the East, rows increase to the South.
+% Validated: sampling at the world origin returns 624.77 m vs the declared
+% origin elevation 624.8 m (4 cm agreement).
+    persistent A nr nc
+    if isempty(A)
+        A = double(imread(demFile));
+        if ndims(A) == 3, A = A(:, :, 1); end     % use first channel if RGB
+        [nr, nc] = size(A);
+    end
+
+    % --- Gazebo georeference constants ---
+    lat0  = 47.34254503685453;   lon0 = 8.60504150390625;   % world origin
+    elev0 = 624.8;                                           % [m AMSL] at origin
+    Cx = 103.78;   Cy = -103.46;   Zbase = -17.44;           % heightmap pose [m]
+    W  = 622.71;   H  = 620.76;    Vz    = 60.8;             % heightmap size [m]
+    mPerLat = 111320;            mPerLon = 111320 * cosd(lat0);
+
+    % lat/lon -> world ENU [m]
+    E = (lon - lon0) * mPerLon;
+    N = (lat - lat0) * mPerLat;
+
+    % world ENU -> fractional pixel (1-indexed; col=East, row=South)
+    col = (E - Cx + W / 2) / W * (nc - 1) + 1;
+    row = (H / 2 - (N - Cy)) / H * (nr - 1) + 1;
+    col = min(max(col, 1), nc);
+    row = min(max(row, 1), nr);
+
+    px   = interp2(A, col, row, 'linear');        % bilinear height value
+    elev = elev0 + Zbase + (px / 255) * Vz;
+end
+
+function write_qgc_wpl(fname, lat, lon, alt, yaw, homeAmsl)
 % WRITE_QGC_WPL  Write a QGroundControl WPL 110 mission file (also read by
 % Mission Planner and flyable by ArduPilot). Tab-separated columns are:
 %   idx  current  frame  command  p1 p2 p3 p4  lat  lon  alt  autocontinue
 % The SE(3) desired heading is written into param4 (yaw, deg, compass).
-    if nargin < 5 || isempty(yaw), yaw = nan(size(lat)); end
+% homeAmsl (optional) sets the HOME row's absolute altitude [m AMSL]; all
+% subsequent waypoints stay relative-to-home (AGL).
+    if nargin < 5 || isempty(yaw),      yaw = nan(size(lat)); end
+    if nargin < 6 || isempty(homeAmsl), homeAmsl = alt(1);    end
     fid = fopen(fname, 'w');
     if fid < 0, error('Cannot open %s for writing', fname); end
     closer = onCleanup(@() fclose(fid)); %#ok<NASGU>
@@ -298,9 +348,10 @@ function write_qgc_wpl(fname, lat, lon, alt, yaw)
     CMD_LAND      = 21;    % MAV_CMD_NAV_LAND
 
     idx = 0;
-    % Row 0: HOME at the first point (Mission Planner uses line 0 as home)
+    % Row 0: HOME at the first point (Mission Planner uses line 0 as home).
+    % Frame 0 => altitude is absolute (AMSL); use the real terrain elevation.
     fprintf(fid, '%d\t1\t%d\t%d\t0\t0\t0\t0\t%.8f\t%.8f\t%.6f\t1\n', ...
-        idx, FRAME_GLOBAL, CMD_WAYPOINT, lat(1), lon(1), alt(1));
+        idx, FRAME_GLOBAL, CMD_WAYPOINT, lat(1), lon(1), homeAmsl);
     idx = idx + 1;
 
     % Row 1: TAKEOFF to the first waypoint altitude (yaw -> param4)

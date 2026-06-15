@@ -14,12 +14,11 @@ cfg.simMode      = 2;         % 1: by time, 2: by target distance
 cfg.targetThresh = 2;         % [m]  allowed error for final target distance
 
 %% ======================== Scenario =======================================
-cfg.scene        = 100;      % Scene number (see create_scene.m)
+cfg.scene        = 2;      % Scene number (see create_scene.m)
                               %   0) No object   1) 1 sphere   2) 2 objects
                               %   3) 3 objects   4) 3 complex  5) demo shapes
                               %   7) non-urban  12) urban      41/42/44) dynamic
                               %  100) GeoJSON buildings (oriented boxes)
-cfg.env          = "static"; % "static" or "dynamic" environmental constraint
 cfg.multiTarget  = false;     % true: fly to multiple destinations
 
 %% ---- GeoJSON scenario options (only used when cfg.scene == 100) ----------
@@ -37,21 +36,16 @@ cfg.zFloor       = 2;        % [m] minimum AGL altitude; IFDS waypoints are
                               %     clamped so they never descend below this
 
 %% ======================== IFDS Tuning ====================================
-cfg.rho0         = 2.5;       % Repulsive parameter  (rho >= 0)
-cfg.sigma0       = 0.01;      % Tangential parameter
+cfg.rho0         = 20.5;       % Repulsive parameter  (rho >= 0)
+cfg.sigma0       = 20.5;      % Tangential parameter
 cfg.sf           = uint8(0);  % Shape-following demand (1 = on, 0 = off)
-
-%% ======================== Constraint Matrix ==============================
-cfg.k            = 0.5;       % Weather coupling gain (0 = no weather effect)
-cfg.B_U          = 0.9;       % Upper bound  [B_L < B_U <= 1]
-cfg.B_L          = 0;         % Lower bound  [0 <= B_L < B_U]
 
 %% ======================== Path Optimizer =================================
 cfg.useOptimizer = 0;         % 0: Off,  1: Global optimized,  2: Local optimized
 cfg.delta_g      = 2;        % [m]  minimum allowed gap distance
 
 %% ======================== UAV ============================================
-cfg.C            = 9.5;       % [m/s] UAV cruising speed
+cfg.C            = 3;       % [m/s] UAV cruising speed
 
 % Initial UAV state
 cfg.x_i          = 0;         % [m]

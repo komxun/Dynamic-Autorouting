@@ -1,19 +1,11 @@
-function [Param, Object, state, filters, logger, WMCell, dwdxCell, dwdyCell, ...
-         weatherMat, weatherMatMod] = setup_simulation(cfg)
+function [Param, Object, state, filters, logger] = setup_simulation(cfg)
 % SETUP_SIMULATION  Build all data structures needed by the IFDS main loop.
-%
-%   [Param, Object, state, filters, logger, WMCell, dwdxCell, dwdyCell, ...
-%    weatherMat, weatherMatMod] = setup_simulation(cfg)
+
 %
 %   Takes the cfg struct from default_config() and returns everything
 %   main.m needs to run the simulation.
 
     P = cfg.P;
-
-    %% Constraint matrix (weather data)
-    matFile = fullfile('data', 'WeatherMat_321.mat');
-    [weatherMat, weatherMatMod, WMCell, dwdxCell, dwdyCell] = ...
-        initialize_constraint_matrix(matFile, cfg.B_L, cfg.B_U);
 
     %% Param table (passed to IFDS and helpers)
     Param.showDisp       = cfg.showDisp;
@@ -36,9 +28,7 @@ function [Param, Object, state, filters, logger, WMCell, dwdxCell, dwdyCell, ...
     Param.Yfinal         = cfg.Yfinal;
     Param.Zfinal         = cfg.Zfinal;
     Param.useOptimizer   = cfg.useOptimizer;
-    Param.k              = cfg.k;
-    Param.B_U            = cfg.B_U;
-    Param.B_L            = cfg.B_L;
+
     if isfield(cfg, 'zFloor'), Param.zFloor = cfg.zFloor; else, Param.zFloor = 0; end
 
     %% Object structure pre-allocation

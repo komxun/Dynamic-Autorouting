@@ -23,7 +23,7 @@ cfg.env          = "static"; % "static" or "dynamic" environmental constraint
 cfg.multiTarget  = false;     % true: fly to multiple destinations
 
 %% ---- GeoJSON scenario options (only used when cfg.scene == 100) ----------
-cfg.geojson_file = fullfile('data', 'buildings_map5.geojson');
+cfg.geojson_file = fullfile('data', 'buildings_map6.geojson');
 cfg.geojson_alt  = 8;        % [m] cruise altitude (start/finish & target z)
 cfg.geojson_p    = 2;        % super-ellipsoid exponent index (^8 -> sharp box)
 cfg.geojson_pad  = 1.5;        % [m] lateral safety added to each box
@@ -41,10 +41,6 @@ cfg.rho0         = 2.5;       % Repulsive parameter  (rho >= 0)
 cfg.sigma0       = 0.5;      % Tangential parameter
 cfg.sf           = uint8(0);  % Shape-following demand (1 = on, 0 = off)
 
-%% ======================== Constraint Matrix ==============================
-cfg.k            = 0;       % Weather coupling gain (0 = no weather effect)
-cfg.B_U          = 0.9;       % Upper bound  [B_L < B_U <= 1]
-cfg.B_L          = 0;         % Lower bound  [0 <= B_L < B_U]
 
 %% ======================== Path Optimizer =================================
 cfg.useOptimizer = 0;         % 0: Off,  1: Global optimized,  2: Local optimized
@@ -81,7 +77,7 @@ P.Jzz       = 0.1377;
 P.tau       = 0.05;           % dirty-derivative filter time constant
 
 % Control gains
-P.kx        = 4   * P.mass;
+P.kx        = 8   * P.mass;
 P.kv        = 5.6 * P.mass;
 P.kR        = 8.81;
 P.kOmega    = 2.54;

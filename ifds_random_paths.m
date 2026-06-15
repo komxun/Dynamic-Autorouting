@@ -73,7 +73,7 @@ for i = 1:nPairs
     cfgi.Xini = p0(1); cfgi.Yini = p0(2); cfgi.Zini = z0;
     cfgi.Xfinal = p1(1); cfgi.Yfinal = p1(2); cfgi.Zfinal = z1;
 
-    [Param, Object, ~, ~, ~, WMCell, dwdxCell, dwdyCell] = setup_simulation(cfgi);
+    [Param, Object, ~, ~, ~] = setup_simulation(cfgi);
 
     % Single IFDS call (rt = 1) -> one global path, no SE(3) tracking
     Wp = zeros(3, cfgi.tsim + 1);
@@ -82,7 +82,7 @@ for i = 1:nPairs
     loc_final = [p1(1); p1(2); z1];
 
     [Paths, Object, len, fp] = IFDS(cfg.rho0, cfg.sigma0, 0, loc_final, 1, ...
-        Wp, Paths, Param, 1, Object, WMCell{15}, dwdxCell{15}, dwdyCell{15});
+        Wp, Paths, Param, 1, Object);
 
     Paths10{i} = Paths{1, 1};
     lengths(i) = len;
@@ -190,6 +190,19 @@ legend([hReal, hBox], {'Real polygon', 'Fitted parallelepiped'}, ...
     'Location', 'southoutside');
 
 sgtitle('Parallelepiped fitting vs. real GeoJSON footprints', 'FontSize', 15);
+
+%%
+figure()
+set(gcf, 'Position', get(0, 'Screensize'));
+hold on
+for j = 1:numel(Bfull)
+    fill(Bfull(j).foot(:, 1), Bfull(j).foot(:, 2), [0.8 0.8 0.85], ...
+        'EdgeColor', [0.4 0.4 0.4], 'FaceAlpha', 0.7);
+end
+plot_paths(Paths10, pairs, colors, found);
+axis equal, grid on, view(0, 90)
+xlabel('X [m]'); ylabel('Y [m]');
+
 
 %% 6. Summary
 fprintf('\n===== Summary =====\n');
